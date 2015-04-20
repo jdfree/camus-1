@@ -88,7 +88,7 @@ Installation
 .. ifconfig:: platform_docs
 
    See the :ref:`installation instructions<installation>` for the Confluent
-   Platform. Before starting a Camus job you must have Haddop, Kafka, and the
+   Platform. Before starting a Camus job you must have Hadoop, Kafka, and the
    Schema Registry running. The :ref:`Confluent Platform quickstart<quickstart>`
    explains how to start Kafka and the Schema Registry locally for testing.
    See this
@@ -100,7 +100,7 @@ Installation
    You can download prebuilt versions of Camus as part of the
    `Confluent Platform <http://confluent.io/downloads/>`_. To install from
    source, follow the instructions in the `Development`_ section.
-   Before starting a Camus job you must have Haddop, Kafka, and the
+   Before starting a Camus job you must have Hadoop, Kafka, and the
    Schema Registry running. You can find instructions for Kafka and the Schema
    Registry in the `Schema Registry repository <http://github.com/confluentinc/schema-registry>`_.
    This `guide <http://www.cloudera.com/content/cloudera/en/documentation/core/latest/topics/cdh_qs_cdh5_pseudo.html>`_.
