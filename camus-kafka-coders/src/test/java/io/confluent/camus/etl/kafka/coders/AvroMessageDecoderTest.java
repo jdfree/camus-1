@@ -27,7 +27,7 @@ import org.junit.Test;
 import java.util.Properties;
 
 import io.confluent.camus.etl.kafka.coders.AvroMessageDecoder;
-import io.confluent.kafka.schemaregistry.client.LocalSchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.serializers.KafkaAvroEncoder;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
@@ -36,7 +36,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 public class AvroMessageDecoderTest {
-  private final SchemaRegistryClient schemaRegistry = new LocalSchemaRegistryClient();
+  private final SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
   private final KafkaAvroSerializer avroSerializer = new KafkaAvroSerializer(schemaRegistry);
   private final KafkaAvroEncoder avroEncoder = new KafkaAvroEncoder(schemaRegistry);
 
@@ -67,7 +67,7 @@ public class AvroMessageDecoderTest {
   private AvroMessageDecoder createAvroDecoder(
       String topic, boolean newProducer, SchemaRegistryClient schemaRegisry ) {
     Properties props = new Properties();
-    // Required by AvroMessageDecoder, but not needed by LocalSchemaRegistry
+    // Required by AvroMessageDecoder, but not needed by MockSchemaRegistry
     props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
               org.apache.kafka.common.serialization.ByteArraySerializer.class);
     props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
