@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
+import org.apache.kafka.common.protocol.SecurityProtocol;
 import org.easymock.EasyMock;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -171,8 +172,8 @@ public class CamusJobTestWithMock {
     PartitionMetadata pMeta = EasyMock.createMock(PartitionMetadata.class);
     mocks.add(pMeta);
     EasyMock.expect(pMeta.errorCode()).andReturn((short)0).anyTimes();
-    Broker broker = new Broker(0, "localhost", 2121);
-    EasyMock.expect(pMeta.leader()).andReturn(broker).anyTimes();
+    Broker broker = new Broker(0, "localhost", 2121, SecurityProtocol.PLAINTEXT);
+    EasyMock.expect(pMeta.leader()).andReturn(broker.getBrokerEndPoint(SecurityProtocol.PLAINTEXT)).anyTimes();
     EasyMock.expect(pMeta.partitionId()).andReturn(PARTITION_1_ID).anyTimes();
     List<PartitionMetadata> partitionMetadatas = new ArrayList<PartitionMetadata>();
     partitionMetadatas.add(pMeta);    

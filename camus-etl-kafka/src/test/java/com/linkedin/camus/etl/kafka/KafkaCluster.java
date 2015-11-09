@@ -12,7 +12,8 @@ import java.util.Random;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
 import kafka.utils.Time;
-import kafka.utils.Utils;
+import kafka.utils.CoreUtils;
+import scala.Option;
 
 import org.apache.zookeeper.server.NIOServerCnxn;
 import org.apache.zookeeper.server.ZooKeeperServer;
@@ -88,7 +89,8 @@ public class KafkaCluster {
   }
 
   private static KafkaServer startBroker(Properties props) {
-    KafkaServer server = new KafkaServer(new KafkaConfig(props), new SystemTime());
+    Option<String> noThreadNamePrefix = Option.empty();
+    KafkaServer server = new KafkaServer(new KafkaConfig(props), new SystemTime(), noThreadNamePrefix);
     server.startup();
     return server;
   }
@@ -145,8 +147,8 @@ public class KafkaCluster {
      */
     public void shutdown() {
       factory.shutdown();
-      Utils.rm(snapshotDir);
-      Utils.rm(logDir);
+      CoreUtils.rm(snapshotDir);
+      CoreUtils.rm(logDir);
     }
 
     public String getConnection() {
