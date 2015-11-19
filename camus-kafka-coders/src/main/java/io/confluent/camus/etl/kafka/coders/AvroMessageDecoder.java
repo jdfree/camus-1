@@ -110,7 +110,9 @@ public class AvroMessageDecoder extends MessageDecoder<byte[], Record> {
       Schema schema = schemaRegistry.getByID(id);
       if (schema == null)
         throw new IllegalStateException("Unknown schema id: " + id);
-      logger.debug("Schema = " + schema.toString());
+      if (logger.isDebugEnabled()) {
+        logger.debug("Schema = " + schema.toString());
+      }
       String subject = constructSubject(topic, schema, isNew);
       logger.debug("Subject = " + subject);
 
