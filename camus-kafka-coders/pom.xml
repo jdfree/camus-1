@@ -31,7 +31,7 @@
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka_2.10</artifactId>
-            <version>0.9.0.0-SNAPSHOT</version>
+            <version>0.9.0.0</version>
         </dependency>
         <!-- Gson is needed for JSONStringMessageDecoder -->
         <dependency>
