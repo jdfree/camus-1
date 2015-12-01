@@ -1,5 +1,8 @@
 package com.linkedin.camus.etl.kafka;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+
 import com.linkedin.camus.etl.kafka.common.DateUtils;
 import com.linkedin.camus.etl.kafka.common.EmailClient;
 import com.linkedin.camus.etl.kafka.common.EtlCounts;
@@ -11,24 +14,6 @@ import com.linkedin.camus.etl.kafka.mapred.EtlMapper;
 import com.linkedin.camus.etl.kafka.mapred.EtlMultiOutputFormat;
 import com.linkedin.camus.etl.kafka.mapred.EtlRecordReader;
 import com.linkedin.camus.etl.kafka.reporter.BaseReporter;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.lang.reflect.InvocationTargetException;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-import java.util.regex.Pattern;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -73,8 +58,23 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.lang.reflect.InvocationTargetException;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.regex.Pattern;
 
 
 public class CamusJob extends Configured implements Tool {
@@ -643,7 +643,7 @@ public class CamusJob extends Configured implements Tool {
 
   public static void main(String[] args) throws Exception {
     CamusJob job = new CamusJob();
-    ToolRunner.run(job, args);
+    ToolRunner.run(new Configuration(), job, args);
   }
 
   @SuppressWarnings("static-access")
