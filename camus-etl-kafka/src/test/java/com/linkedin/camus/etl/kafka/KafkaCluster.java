@@ -1,5 +1,9 @@
 package com.linkedin.camus.etl.kafka;
 
+import org.apache.kafka.common.utils.Utils;
+import org.apache.zookeeper.server.NIOServerCnxn;
+import org.apache.zookeeper.server.ZooKeeperServer;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -12,10 +16,7 @@ import java.util.Random;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
 import kafka.utils.Time;
-import kafka.utils.Utils;
-
-import org.apache.zookeeper.server.NIOServerCnxn;
-import org.apache.zookeeper.server.ZooKeeperServer;
+import scala.Option;
 
 
 public class KafkaCluster {
@@ -88,7 +89,7 @@ public class KafkaCluster {
   }
 
   private static KafkaServer startBroker(Properties props) {
-    KafkaServer server = new KafkaServer(new KafkaConfig(props), new SystemTime());
+    KafkaServer server = new KafkaServer(new KafkaConfig(props), new SystemTime(), Option.apply(""));
     server.startup();
     return server;
   }
@@ -145,8 +146,8 @@ public class KafkaCluster {
      */
     public void shutdown() {
       factory.shutdown();
-      Utils.rm(snapshotDir);
-      Utils.rm(logDir);
+      Utils.delete(snapshotDir);
+      Utils.delete(logDir);
     }
 
     public String getConnection() {
