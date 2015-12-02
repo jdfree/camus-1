@@ -643,7 +643,7 @@ public class CamusJob extends Configured implements Tool {
 
   public static void main(String[] args) throws Exception {
     CamusJob job = new CamusJob();
-    ToolRunner.run(new Configuration(), job, args);
+    ToolRunner.run(job, args);
   }
 
   @SuppressWarnings("static-access")
