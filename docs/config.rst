@@ -18,6 +18,14 @@ Schema Registry Configuration
  * Required: No
  * Default: 1000
 
+``is.new.producer``
+ Set to true if the data Camus is consuming from Kafka was created using the new producer, or
+ set to false if it was created with the old producer.
+
+ * Type: boolean
+ * Required: No
+ * Default: true
+
 Camus Job Configuration
 -----------------------
 ``camus.job.name``
