@@ -1,4 +1,4 @@
-.. _camus_config:
+.. _camus_changelog:
 
 Changelog
 =========
