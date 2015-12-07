@@ -66,8 +66,7 @@ variety of Hadoop distributions.
 
    # Assuming that you have hadoop on your PATH, HADOOP_CONF_DIR is properly configured, and that
    # schema.registry.url points to the correct address.
-   $ cd camus
-   $ bin/camus-run -D schema.registry.url=http://localhost:8081 -P etc/camus.properties
+   $ bin/camus-run -D schema.registry.url=http://localhost:8081 -P etc/camus/camus.properties
 
 If you need more control over how the job is executed, see the `Deployment`_ section for more
 details about required configuration.
