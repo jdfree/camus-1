@@ -34,8 +34,8 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.kafka</groupId>
-			<artifactId>kafka_2.10</artifactId>
-			<version>0.8.2.2</version>
+			<artifactId>kafka_2.11</artifactId>
+			<version>0.9.0.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.github.sgroschupf</groupId>
@@ -84,6 +84,11 @@
 			<groupId>com.indeed</groupId>
 			<artifactId>java-dogstatsd-client</artifactId>
 			<version>2.0.8</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hive</groupId>
+			<artifactId>hive-metastore</artifactId>
+			<version>1.2.0</version>
 		</dependency>
 	</dependencies>
 
