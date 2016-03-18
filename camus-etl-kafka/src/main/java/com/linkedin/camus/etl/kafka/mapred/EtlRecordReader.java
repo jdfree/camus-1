@@ -1,29 +1,40 @@
 package com.linkedin.camus.etl.kafka.mapred;
 
+import com.google.common.collect.ImmutableMap;
 import com.linkedin.camus.coders.CamusWrapper;
 import com.linkedin.camus.coders.MessageDecoder;
+import com.linkedin.camus.coders.MessageDecoderException;
 import com.linkedin.camus.etl.kafka.CamusJob;
 import com.linkedin.camus.etl.kafka.coders.MessageDecoderFactory;
 import com.linkedin.camus.etl.kafka.common.EtlKey;
 import com.linkedin.camus.etl.kafka.common.EtlRequest;
 import com.linkedin.camus.etl.kafka.common.ExceptionWritable;
 import com.linkedin.camus.etl.kafka.common.KafkaReader;
-
+import com.linkedin.camus.schemaregistry.CachedSchemaRegistry;
+import com.linkedin.camus.schemaregistry.SchemaDetails;
+import com.linkedin.camus.schemaregistry.SchemaRegistry;
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
+import kafka.message.Message;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.io.BinaryDecoder;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.DecoderFactory;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.mapreduce.InputSplit;
-import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.RecordReader;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.*;
 import org.apache.log4j.Logger;
 import org.joda.time.DateTime;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.HashSet;
-
-import kafka.message.Message;
+import java.util.Map;
+import java.util.Properties;
 
 
 public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
@@ -118,13 +129,251 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
   private CamusWrapper getWrappedRecord(String topicName, byte[] payload) throws IOException {
     CamusWrapper r = null;
     try {
-      r = decoder.decode(payload);
+
+//      r = decoder.decode(payload);
+      DecoderFactory decoderFactory;
+      SchemaRegistry<Schema> registry;
+      Schema latestSchema;
+      String latestId;
+
+      try {
+        registry = new ConfluentAvroSchemaRegistry();
+        Properties props = new Properties();
+        for (Map.Entry<String, String> entry : context.getConfiguration()) {
+          props.put(entry.getKey(), entry.getValue());
+        }
+        registry.init(props);
+
+        registry = new CachedSchemaRegistry<Schema>(registry);
+        SchemaDetails<Schema> details = registry.getLatestSchemaByTopic(topicName);
+        latestSchema = details.getSchema();
+        latestId = details.getId();
+      } catch (Exception e) {
+        throw new MessageDecoderException(e);
+      }
+
+      decoderFactory = DecoderFactory.get();
+      MessageDecoderHelper helper = null;
+      try {
+
+        helper = new MessageDecoderHelper(registry, topicName, payload, latestSchema).invoke();
+
+        DatumReader<GenericData.Record> reader =
+                (helper.getTargetSchema() == null) ? new GenericDatumReader<GenericData.Record>(helper.getSchema())
+                        : new GenericDatumReader<GenericData.Record>(helper.getTargetSchema(), helper.getTargetSchema());
+
+        BinaryDecoder bindec = decoderFactory.binaryDecoder(helper.getBuffer().array(), helper.getStart(), helper.getLength(), null);
+
+        GenericData.Record record = reader.read(null, bindec);
+
+        CamusAvroWrapper result = new CamusAvroWrapper(record);
+
+        return result;
+      } catch (IOException e) {
+//        if ("raw_ad_activity".equals(topicName))
+//          mapperContext.write(key, new ExceptionWritable(new RuntimeException(topicName+" james "+latestId+
+//                  " "+helper.getId()+" "+helper.getStart()+" "+helper.getLength()+" "+payload.length)));
+        throw new IOException(topicName+" james "+latestId+
+                " "+helper.getId()+" "+helper.getStart()+" "+helper.getLength()+" "+payload.length, e);
+      }
+
     } catch (Exception e) {
       if (!skipSchemaErrors) {
+        if (e instanceof IOException) {
+          throw (IOException)e;
+        }
         throw new IOException(e);
       }
     }
     return r;
+  }
+  public static class CamusAvroWrapper extends CamusWrapper<GenericData.Record> {
+
+    public CamusAvroWrapper(GenericData.Record record) {
+      super(record);
+      GenericData.Record header = (GenericData.Record) super.getRecord().get("header");
+      if (header != null) {
+        if (header.get("server") != null) {
+          put(new Text("server"), new Text(header.get("server").toString()));
+        }
+        if (header.get("service") != null) {
+          put(new Text("service"), new Text(header.get("service").toString()));
+        }
+      }
+    }
+
+    @Override
+    public long getTimestamp() {
+      GenericData.Record header = (GenericData.Record) super.getRecord().get("header");
+
+      if (header != null && header.get("ts") != null) {
+        return (Long) header.get("ts");
+      } else if (super.getRecord().get("timestamp") != null) {
+        return (Long) super.getRecord().get("timestamp");
+      } else {
+        return System.currentTimeMillis();
+      }
+    }
+  }
+  public class MessageDecoderHelper {
+    //private Message message;
+    private ByteBuffer buffer;
+    private Schema schema;
+    private int start;
+    private int length;
+    private Schema targetSchema;
+    private Schema latestSchema;
+    private String id;
+    private static final byte MAGIC_BYTE = 0x0;
+    private final SchemaRegistry<Schema> registry;
+    private final String topicName;
+    private byte[] payload;
+
+    public MessageDecoderHelper(SchemaRegistry<Schema> registry, String topicName, byte[] payload, Schema latestSchema) {
+      this.registry = registry;
+      this.topicName = topicName;
+      this.payload = payload;
+      this.latestSchema = latestSchema;
+    }
+
+    public ByteBuffer getBuffer() {
+      return buffer;
+    }
+
+    public Schema getSchema() {
+      return schema;
+    }
+
+    public int getStart() {
+      return start;
+    }
+
+    public int getLength() {
+      return length;
+    }
+
+    public String getId() {
+      return id;
+    }
+
+    public Schema getTargetSchema() {
+      return targetSchema;
+    }
+
+    private ByteBuffer getByteBuffer(byte[] payload) {
+      ByteBuffer buffer = ByteBuffer.wrap(payload);
+      if (buffer.get() != MAGIC_BYTE)
+        throw new IllegalArgumentException("Unknown magic byte!");
+      return buffer;
+    }
+
+    public MessageDecoderHelper invoke() {
+      buffer = getByteBuffer(payload);
+      id = Integer.toString(buffer.getInt());
+      schema = registry.getSchemaByID(topicName, id);
+      if (schema == null)
+        throw new IllegalStateException("Unknown schema id: " + id);
+
+      start = buffer.position() + buffer.arrayOffset();
+      length = buffer.limit() - 5;
+
+      // try to get a target schema, if any
+      targetSchema = latestSchema;
+      return this;
+    }
+  }
+
+  public class ConfluentAvroSchemaRegistry implements SchemaRegistry<Schema> {
+    private final Map<String, String> TOPIC_TO_SUBJECT = new ImmutableMap.Builder<String, String>().put("quantcast_metadata","raw_metadata").
+            put("raw_oa_lg_stream_automation", "raw_oa_lg_stream").
+            put("raw_ad_activity_automation","raw_ad_activity").
+            put("raw_beacon_automation","raw_beacon").
+            put("raw_demographic_automation","raw_demographic").
+            put("raw_rtb_automation","raw_rtb").
+            put("raw_external_data_automation","raw_external_data").
+            put("raw_cookie_store_automation","raw_cookie_store").
+            put("raw_log2kafka_automation","raw_log2kafka").
+            put("raw_metadata_automation","raw_metadata").
+            put("raw_url_attributes_automation","raw_url_attributes").
+            put("raw_video_stream_automation","raw_video_stream").
+            put("raw_yellow_box_automation","raw_yellow_box").
+            put("raw_apache_log_automation","raw_apache_log").
+            put("raw_oa_lg_stream_qa","raw_oa_lg_stream").
+            put("raw_ad_activity_qa","raw_ad_activity").
+            put("raw_beacon_qa","raw_beacon").
+            put("raw_demographic_qa","raw_demographic").
+            put("raw_rtb_qa","raw_rtb").
+            put("raw_external_data_qa","raw_external_data").
+            put("raw_cookie_store_qa","raw_cookie_store").
+            put("raw_log2kafka_qa","raw_log2kafka").
+            put("raw_metadata_qa","raw_metadata").
+            put("raw_url_attributes_qa","raw_url_attributes").
+            put("raw_video_stream_qa","raw_video_stream").
+            put("raw_yellow_box_qa","raw_yellow_box").
+            put("raw_apache_log_qa","raw_apache_log").
+            put("raw_addelivery_trace","raw_external_data").
+            put("raw_ad_activity", "raw_ad_activity").
+            put("raw_beacon", "raw_beacon").
+            build();
+    private CachedSchemaRegistryClient client;
+    public static final String ETL_SCHEMA_REGISTRY_URL = "etl.schema.registry.url";
+    private final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(ConfluentAvroSchemaRegistry.class);
+    public void init(Properties props){
+      //The 50 represents the number of allowable version per schema
+      client = new CachedSchemaRegistryClient(props.getProperty(ETL_SCHEMA_REGISTRY_URL), 50);
+    }
+
+    public String register(String subject, Schema schema){
+      try {
+        return String.valueOf(client.register(subject, schema));
+      } catch(Exception e){
+        LOGGER.error("Error registering schema ["+ schema.getFullName() + "] and subject ["+subject+"]", e);
+        return null;
+      }
+    }
+
+    public Schema getSchemaByID(String topic, String version) {
+      LOGGER.info("Getting schema for topic [" + topic + "] and version [" + version + "]");
+      try {
+        String subject = TOPIC_TO_SUBJECT.get(topic) == null? topic : TOPIC_TO_SUBJECT.get(topic);
+        int id = client.getLatestSchemaMetadata(subject).getId();
+        return client.getByID(id);
+      } catch (Exception e){
+        LOGGER.error("Could not get schema by ID for topic [" + topic + "] and version [" + version + "]", e);
+
+        return null;
+      }
+
+    }
+
+    public SchemaDetails<Schema> getLatestSchemaByTopic(String topic) {
+      try {
+        //fall back to topic name for subject if it doesnt explicitly exist
+        String subject = TOPIC_TO_SUBJECT.get(topic) == null? topic : TOPIC_TO_SUBJECT.get(topic);
+        LOGGER.info("getting schema for topic [" + topic + "] and subject [" + subject + "]");
+        int id = client.getLatestSchemaMetadata(subject).getId();
+
+        if(LOGGER.isDebugEnabled()){
+          LOGGER.debug("ID for schema is [ " + id + "]");
+        }
+
+        Schema schema = client.getByID(id);
+        if(schema != null){
+          LOGGER.info("Schema is not null");
+
+          if(LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Schema: " + "\n" + schema.getFullName() + "\n" + schema.getFields());
+          }
+
+        }
+        return new SchemaDetails<Schema>(topic, String.valueOf(id), schema);
+      } catch (Exception e){
+        LOGGER.error("Failed getting schema for topic [" + topic + "]", e);
+        return null;
+      }
+    }
+
+
   }
 
   private static byte[] getBytes(BytesWritable val) {
@@ -252,7 +501,13 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
           CamusWrapper wrapper;
           try {
             wrapper = getWrappedRecord(key.getTopic(), bytes);
+            if (wrapper == null) {
+              mapperContext.write(key, new ExceptionWritable(new RuntimeException("null record from "+decoder.getClass().getCanonicalName()+
+                      "; "+bytes.length+"; "+bytes)));
+            }
+//            mapperContext.write(key, new ExceptionWritable(new RuntimeException("got a wrapper! "+bytes.length+" "+wrapper.getRecord().getClass())));
           } catch (Exception e) {
+            mapperContext.write(key, new ExceptionWritable(e));
             if (exceptionCount < getMaximumDecoderExceptionsToPrint(context)) {
               mapperContext.write(key, new ExceptionWritable(e));
               exceptionCount++;
@@ -265,7 +520,8 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
           }
 
           if (wrapper == null) {
-            mapperContext.write(key, new ExceptionWritable(new RuntimeException("null record")));
+            mapperContext.write(key, new ExceptionWritable(new RuntimeException("null record from "+decoder.getClass().getCanonicalName()+
+                    "; "+context)));
             continue;
           }
 
